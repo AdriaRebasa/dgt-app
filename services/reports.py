@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QTextDocument
+from PyQt6.QtCore import Qt, QMarginsF
+from PyQt6.QtGui import QPageLayout, QTextDocument
 from PyQt6.QtPrintSupport import QPrinter
 
 
@@ -47,7 +47,7 @@ def export_html_to_pdf(html: str, output_path: str) -> None:
     printer = QPrinter(QPrinter.PrinterMode.HighResolution)
     printer.setOutputFormat(QPrinter.OutputFormat.PdfFormat)
     printer.setOutputFileName(output_path)
-    printer.setPageMargins(12, 12, 12, 12, QPrinter.Unit.Millimeter)
+    printer.setPageMargins(QMarginsF(12, 12, 12, 12), QPageLayout.Unit.Millimeter)
 
     doc = QTextDocument()
     doc.setHtml(html)

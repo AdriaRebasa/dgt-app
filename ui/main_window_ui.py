@@ -27,6 +27,7 @@ from PyQt6.QtWidgets import (
     QToolButton,
     QVBoxLayout,
     QWidget,
+    QApplication,
 )
 
 from services.charts import build_bar_chart
@@ -213,7 +214,12 @@ class MainWindow(QMainWindow):
         return container
 
     def _import_csv(self) -> None:
-        path, _ = QFileDialog.getOpenFileName(self, "Select CSV file", "", "CSV Files (*.csv)")
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select CSV or TXT file",
+            "",
+            "CSV or Text Files (*.csv *.txt);;All Files (*)",
+        )
         if not path:
             return
         inserted, periods = import_csv(self.db, path)
@@ -281,13 +287,13 @@ class MainWindow(QMainWindow):
         clauses = []
         for col, value in filters:
             if col and value:
-                clauses.append(f'"{col}" = ?')
+                clauses.append(f'TRIM("{col}") = ?')
         where_sql = f"WHERE {' AND '.join(clauses)}" if clauses else ""
         query = QSqlQuery(self.db)
-        query.prepare(f'SELECT DISTINCT "{column}" FROM exams {where_sql} ORDER BY "{column}"')
+        query.prepare(f'SELECT DISTINCT TRIM("{column}") FROM exams {where_sql} ORDER BY TRIM("{column}")')
         for col, value in filters:
             if col and value:
-                query.addBindValue(value)
+                query.addBindValue(value.strip())
         query.exec()
         values = []
         while query.next():
@@ -317,7 +323,7 @@ class MainWindow(QMainWindow):
                 metrics.append("COUNT(*) as total_exams")
             select_sql = ", ".join([f'"{c}"' for c in group_columns] + metrics)
         else:
-            select_sql = ", ".join([f'"{c}"' for c in select_columns])
+            select_sql = ", ".join([f'"{c}"' for c in select_columns]) if select_columns else "*"
 
         where_clauses = []
         params = []
@@ -327,8 +333,8 @@ class MainWindow(QMainWindow):
 
         from_month = self.from_month.currentText()
         to_month = self.to_month.currentText()
-        from_year = self.from_year.value() if self.from_year.value() != 2000 else None
-        to_year = self.to_year.value() if self.to_year.value() != 2000 else None
+        from_year = self.from_year.value() if self.from_year.value() != 0 else None
+        to_year = self.to_year.value() if self.to_year.value() != 0 else None
 
         if month_col and year_col and from_year and from_month:
             where_clauses.append(
@@ -350,8 +356,8 @@ class MainWindow(QMainWindow):
         ]
         for col, value in filters:
             if col and value:
-                where_clauses.append(f'"{col}" = ?')
-                params.append(value)
+                where_clauses.append(f'TRIM("{col}") = ?')
+                params.append(value.strip())
 
         where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
         group_sql = ""
@@ -377,6 +383,8 @@ class MainWindow(QMainWindow):
                     selected.append(column)
         if not selected:
             selected = [col for col in self.standard_columns.values() if col]
+        if not selected:
+            selected = get_table_columns(self.db, "exams")
         return selected
 
     def _group_columns(self, group_label: str) -> List[str]:
@@ -486,13 +494,22 @@ class MainWindow(QMainWindow):
         export_html_to_pdf(html, path)
 
     def _collect_table_data(self) -> Tuple[List[str], List[List[str]]]:
-        headers = [self.model.headerData(i, Qt.Orientation.Horizontal) for i in range(self.model.columnCount())]
+        while self.model.canFetchMore():
+            self.model.fetchMore()
+            QApplication.processEvents()
+        column_count = self.model.columnCount()
+        row_count = self.model.rowCount()
+        headers = [self.model.headerData(i, Qt.Orientation.Horizontal) for i in range(column_count)]
         rows = []
-        for row in range(self.model.rowCount()):
+        print(f"Exporting {row_count} rows and {column_count} columns...")
+        for row in range(row_count):
             values = []
-            for col in range(self.model.columnCount()):
+            for col in range(column_count):
                 values.append(str(self.model.data(self.model.index(row, col))))
             rows.append(values)
+            if (row + 1) % 1000 == 0 or row + 1 == row_count:
+                print(f"Collected {row + 1}/{row_count} rows for export...")
+                QApplication.processEvents()
         return [str(h) for h in headers], rows
 
     def _apply_header_labels(self) -> None:
