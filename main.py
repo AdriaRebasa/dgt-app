@@ -7,6 +7,9 @@ from ui.main_window_ui import MainWindow
 
 def main() -> int:
     app = QApplication(sys.argv)
+    app.setOrganizationName("DGT")
+    app.setOrganizationDomain("dgt.es")
+    app.setApplicationName("DrivingExamsStatistics")
     window = MainWindow()
     window.show()
     return app.exec()

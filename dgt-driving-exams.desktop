@@ -1,0 +1,9 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=DGT Driving Exams
+Comment=Driving Exams Statistics viewer
+Exec=/usr/bin/dgt-driving-exams
+Icon=dgt-driving-exams
+Terminal=false
+Categories=Education;Utility;

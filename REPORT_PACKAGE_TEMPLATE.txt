@@ -1,0 +1,258 @@
+Driving Exams Statistics - Linux Packaging Report (Template)
+Date: 2026-02-19
+
+Student: <YOUR_NAME>
+Course/Group: <YOUR_GROUP>
+Project: Driving Exams Statistics (PyQt6)
+Target package format: DEB
+
+==================================================
+1) Project Analysis and Required Adaptations
+==================================================
+
+This project is a PyQt6 desktop app with entrypoint `main.py` and SQLite access in `services/database.py`.
+Main structure:
+- `main.py` starts Qt app and main window.
+- `ui/main_window_ui.py` contains the GUI.
+- `services/database.py` manages SQLite connection.
+- `services/csv_importer.py`, `services/charts.py`, `services/reports.py` provide business logic.
+
+Required adaptation for this assignment:
+- Store user database in platform user data folder using `QStandardPaths`.
+
+Implemented change (for report evidence):
+- `services/database.py` now resolves DB path with `QStandardPaths.StandardLocation.AppDataLocation`.
+- `main.py` now sets stable app metadata:
+  - Organization: `DGT`
+  - Domain: `dgt.es`
+  - Application name: `DrivingExamsStatistics`
+
+Expected DB location (Linux):
+- `~/.local/share/DGT/DrivingExamsStatistics/driving_exams.db`
+(Actual path may vary if `XDG_DATA_HOME` is overridden.)
+
+[INSERT SCREENSHOT 1 HERE]
+What to capture:
+- Editor showing `services/database.py` function using `QStandardPaths`.
+- Editor showing `main.py` setting organization/application name.
+
+==================================================
+2) DEB Package Creation Process
+==================================================
+
+Note: In this execution environment, `dpkg-deb` is not installed, so package creation was prepared as command procedure to run on a Debian/Ubuntu machine.
+
+2.1 Build artifact (recommended)
+- Create a standalone binary using PyInstaller.
+
+Commands:
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt pyinstaller
+pyinstaller --name dgt-driving-exams --windowed main.py
+```
+
+2.2 Create DEB folder structure
+Commands:
+```bash
+mkdir -p pkgroot/DEBIAN
+mkdir -p pkgroot/opt/dgt-driving-exams
+mkdir -p pkgroot/usr/bin
+mkdir -p pkgroot/usr/share/applications
+mkdir -p pkgroot/usr/share/icons/hicolor/256x256/apps
+```
+
+2.3 Copy app files
+Commands:
+```bash
+cp -r dist/dgt-driving-exams/* pkgroot/opt/dgt-driving-exams/
+```
+
+2.4 Launcher wrapper script
+Create `pkgroot/usr/bin/dgt-driving-exams`:
+```bash
+#!/bin/sh
+exec /opt/dgt-driving-exams/dgt-driving-exams "$@"
+```
+
+Then:
+```bash
+chmod 755 pkgroot/usr/bin/dgt-driving-exams
+```
+
+2.5 Desktop entry
+Create `pkgroot/usr/share/applications/dgt-driving-exams.desktop`:
+```ini
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=DGT Driving Exams
+Comment=Driving Exams Statistics viewer
+Exec=/usr/bin/dgt-driving-exams
+Icon=dgt-driving-exams
+Terminal=false
+Categories=Education;Utility;
+```
+
+2.6 Icon
+- Place app icon at:
+  - `pkgroot/usr/share/icons/hicolor/256x256/apps/dgt-driving-exams.png`
+
+2.7 Control file
+Create `pkgroot/DEBIAN/control`:
+```text
+Package: dgt-driving-exams
+Version: 1.0.0
+Section: utils
+Priority: optional
+Architecture: amd64
+Maintainer: <YOUR_NAME> <YOUR_EMAIL>
+Description: DGT Driving Exams Statistics desktop application
+```
+
+2.8 Build DEB
+Commands:
+```bash
+chmod 755 pkgroot/DEBIAN
+dpkg-deb --build pkgroot dgt-driving-exams_1.0.0_amd64.deb
+```
+
+[INSERT SCREENSHOT 2 HERE]
+What to capture:
+- Terminal showing `pyinstaller` finishing and generated `dist/dgt-driving-exams`.
+
+[INSERT SCREENSHOT 3 HERE]
+What to capture:
+- Terminal showing `dpkg-deb --build ...` success and generated `.deb` file.
+
+==================================================
+3) Installation Test and Launcher Icon Demonstration
+==================================================
+
+3.1 Install package
+Commands:
+```bash
+sudo apt install ./dgt-driving-exams_1.0.0_amd64.deb
+```
+
+3.2 Verify install
+Commands:
+```bash
+dpkg -l | grep dgt-driving-exams
+which dgt-driving-exams
+```
+
+3.3 Open application from launcher
+- Open system application menu and search: `DGT Driving Exams`.
+
+[INSERT SCREENSHOT 4 HERE]
+What to capture:
+- Terminal showing package installation (`apt install`) succeeded.
+
+[INSERT SCREENSHOT 5 HERE]
+What to capture:
+- OS app menu showing `DGT Driving Exams` launcher icon entry.
+
+[INSERT SCREENSHOT 6 HERE]
+What to capture:
+- App window running after launching from OS menu (not from IDE terminal).
+
+==================================================
+4) QStandardPaths and Database in User Data Folder
+==================================================
+
+4.1 Run app and trigger DB creation
+- Start app once (from launcher or terminal):
+```bash
+dgt-driving-exams
+```
+
+4.2 Verify DB path in user data folder
+Commands:
+```bash
+ls -la ~/.local/share/DGT/DrivingExamsStatistics/
+```
+
+Expected file:
+- `driving_exams.db`
+
+Optional explicit check command:
+```bash
+find ~/.local/share -type f -name 'driving_exams.db'
+```
+
+[INSERT SCREENSHOT 7 HERE]
+What to capture:
+- Terminal listing folder `~/.local/share/DGT/DrivingExamsStatistics/` with `driving_exams.db` visible.
+
+[INSERT SCREENSHOT 8 HERE]
+What to capture:
+- App open + terminal side-by-side (or two separate screenshots) proving app execution and DB file location.
+
+==================================================
+5) DEB Signing, Verification, and Tamper Demonstration
+==================================================
+
+Preferred method (native DEB signature): `dpkg-sig`.
+
+5.1 Install signing tools (if missing)
+```bash
+sudo apt update
+sudo apt install dpkg-sig gnupg
+```
+
+5.2 Create/import GPG key
+```bash
+gpg --full-generate-key
+gpg --list-secret-keys --keyid-format LONG
+```
+
+Set key id:
+```bash
+KEYID=<YOUR_LONG_KEY_ID>
+```
+
+5.3 Sign package
+```bash
+dpkg-sig --sign builder -k "$KEYID" dgt-driving-exams_1.0.0_amd64.deb
+```
+
+5.4 Verify signed package
+```bash
+dpkg-sig --verify dgt-driving-exams_1.0.0_amd64.deb
+```
+
+Expected:
+- Verification reports a valid signature.
+
+[INSERT SCREENSHOT 9 HERE]
+What to capture:
+- Terminal showing signing command and successful verification output.
+
+5.5 Tamper test
+Commands:
+```bash
+cp dgt-driving-exams_1.0.0_amd64.deb dgt-driving-exams_1.0.0_amd64_tampered.deb
+printf 'tamper' >> dgt-driving-exams_1.0.0_amd64_tampered.deb
+dpkg-sig --verify dgt-driving-exams_1.0.0_amd64_tampered.deb
+```
+
+Expected:
+- Verification fails or reports invalid/missing signature integrity.
+
+[INSERT SCREENSHOT 10 HERE]
+What to capture:
+- Terminal showing verification failure for tampered `.deb`.
+
+==================================================
+6) Conclusions
+==================================================
+
+- The application was adapted to use `QStandardPaths` for user-specific data.
+- A DEB package was generated with launcher integration (desktop entry + icon).
+- Installation and launcher execution were validated.
+- Database creation in user data directory was demonstrated.
+- Package signing and signature verification were demonstrated.
+- Tamper test proved integrity protection by failing verification after modification.
+

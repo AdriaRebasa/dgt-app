@@ -1,0 +1,92 @@
+Driving Exams Statistics - Arch Packaging Summary Report
+Date: 2026-02-19
+Project: /home/adria/Documents/GitHub/dgt-app
+
+1) Goal
+Create a Linux package for the app using the selected package manager (Arch/pacman), verify launcher integration, prove `QStandardPaths` database location, and demonstrate package signing + tamper detection.
+
+2) Initial Analysis
+The project is a PyQt6 desktop app (`main.py`) with SQLite access in `services/database.py`. At the start, no Arch packaging file (`PKGBUILD`) existed.
+
+3) Code Adaptations Performed
+- `services/database.py`
+  - Replaced fixed relative DB path with `QStandardPaths.StandardLocation.AppDataLocation`.
+  - Added directory creation (`os.makedirs(..., exist_ok=True)`).
+- `main.py`
+  - Set Qt metadata for stable user-data path:
+    - Organization: `DGT`
+    - Domain: `dgt.es`
+    - Application: `DrivingExamsStatistics`
+
+Resulting expected Linux DB path:
+`~/.local/share/DGT/DrivingExamsStatistics/driving_exams.db`
+
+4) Packaging Process (Arch)
+Dependencies installed:
+```bash
+sudo pacman -S --needed base-devel python python-pip python-pyqt6 python-pyqt6-charts
+pip install pyinstaller
+```
+
+Issues encountered and fixes:
+- `pyinstaller` package name not found in pacman -> installed via `pip` in `venv`.
+- `makepkg` failed initially because `PKGBUILD` did not exist -> created packaging files.
+- `makepkg` later failed during debug index processing -> added `options=('!strip' '!debug')` in `PKGBUILD`.
+- Ensured build uses `venv/bin/pyinstaller` when available.
+
+Packaging files created:
+- `PKGBUILD`
+- `dgt-driving-exams.desktop`
+- `dgt-driving-exams.png`
+
+Build command:
+```bash
+makepkg -f
+```
+Build result:
+- `dgt-driving-exams-1.0.0-1-x86_64.pkg.tar.zst` (successfully generated).
+
+5) Installation and Functional Check
+```bash
+sudo pacman -U ./dgt-driving-exams-1.0.0-1-x86_64.pkg.tar.zst
+which dgt-driving-exams
+dgt-driving-exams
+```
+Expected validation:
+- package installs correctly,
+- launcher entry appears in the system menu,
+- app opens from launcher.
+
+6) QStandardPaths Demonstration
+After running app once:
+```bash
+ls -la ~/.local/share/DGT/DrivingExamsStatistics/
+find ~/.local/share -type f -name 'driving_exams.db'
+```
+Expected:
+- `driving_exams.db` exists in user data folder.
+
+7) Signing, Verification, Tamper Test (Required)
+For Arch package signatures (GPG detached signature):
+```bash
+gpg --full-generate-key
+gpg --list-secret-keys --keyid-format LONG
+# set: GPGKEY=<LONG_KEY_ID> in ~/.makepkg.conf
+
+makepkg -f --sign
+gpg --verify dgt-driving-exams-1.0.0-1-x86_64.pkg.tar.zst.sig dgt-driving-exams-1.0.0-1-x86_64.pkg.tar.zst
+```
+Expected:
+- `Good signature` for original package.
+
+Tamper verification:
+```bash
+cp dgt-driving-exams-1.0.0-1-x86_64.pkg.tar.zst dgt-driving-exams-1.0.0-1-x86_64-tampered.pkg.tar.zst
+printf 'tamper' >> dgt-driving-exams-1.0.0-1-x86_64-tampered.pkg.tar.zst
+gpg --verify dgt-driving-exams-1.0.0-1-x86_64.pkg.tar.zst.sig dgt-driving-exams-1.0.0-1-x86_64-tampered.pkg.tar.zst
+```
+Expected:
+- verification failure (`BAD signature` / digest mismatch).
+
+8) Conclusion
+The app was successfully adapted to use `QStandardPaths`, packaged for Arch with `makepkg`, and prepared for installation/launcher validation. The report includes the required signing, signature verification, and tamper detection workflow for submission evidence.

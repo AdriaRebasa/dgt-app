@@ -4,17 +4,24 @@ import os
 import re
 from typing import Dict, Iterable, List, Optional, Tuple
 
+from PyQt6.QtCore import QStandardPaths
 from PyQt6.QtSql import QSqlDatabase, QSqlQuery
 
 
-DB_PATH = os.path.join("data", "driving_exams.db")
+def get_database_path() -> str:
+    data_dir = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.AppDataLocation)
+    if not data_dir:
+        data_dir = os.path.join("data")
+    os.makedirs(data_dir, exist_ok=True)
+    return os.path.join(data_dir, "driving_exams.db")
 
 
 def open_database() -> QSqlDatabase:
     db = QSqlDatabase.addDatabase("QSQLITE")
-    db.setDatabaseName(DB_PATH)
+    db_path = get_database_path()
+    db.setDatabaseName(db_path)
     if not db.open():
-        raise RuntimeError(f"Failed to open database at {DB_PATH}")
+        raise RuntimeError(f"Failed to open database at {db_path}")
     _ensure_base_tables(db)
     return db
 
